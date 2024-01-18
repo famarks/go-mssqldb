@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/famarks/go-mssqldb/internal/cp"
-	"github.com/famarks/go-mssqldb/internal/decimal"
+	"github.com/denisenkom/go-mssqldb/internal/cp"
+	"github.com/denisenkom/go-mssqldb/internal/decimal"
 )
 
 // fixed-length data types
@@ -665,7 +665,7 @@ func readPLPType(ti *typeInfo, r *tdsBuffer) interface{} {
 	default:
 		buf = bytes.NewBuffer(make([]byte, 0, size))
 	}
-	for {
+	for true {
 		chunksize := r.uint32()
 		if chunksize == 0 {
 			break
@@ -690,10 +690,6 @@ func readPLPType(ti *typeInfo, r *tdsBuffer) interface{} {
 }
 
 func writePLPType(w io.Writer, ti typeInfo, buf []byte) (err error) {
-	if buf == nil {
-		err = binary.Write(w, binary.LittleEndian, uint64(_PLP_NULL))
-		return
-	}
 	if err = binary.Write(w, binary.LittleEndian, uint64(_UNKNOWN_PLP_LEN)); err != nil {
 		return
 	}
@@ -811,6 +807,7 @@ func readVarLen(ti *typeInfo, r *tdsBuffer) {
 	default:
 		badStreamPanicf("Invalid type %d", ti.TypeId)
 	}
+	return
 }
 
 func decodeMoney(buf []byte) []byte {
@@ -837,7 +834,8 @@ func decodeGuid(buf []byte) []byte {
 }
 
 func decodeDecimal(prec uint8, scale uint8, buf []byte) []byte {
-	sign := buf[0]
+	var sign uint8
+	sign = buf[0]
 	var dec decimal.Decimal
 	dec.SetPositive(sign != 0)
 	dec.SetPrec(prec)
@@ -1189,7 +1187,7 @@ func makeDecl(ti typeInfo) string {
 		return fmt.Sprintf("char(%d)", ti.Size)
 	case typeBigVarChar, typeVarChar:
 		if ti.Size > 8000 || ti.Size == 0 {
-			return "varchar(max)"
+			return fmt.Sprintf("varchar(max)")
 		} else {
 			return fmt.Sprintf("varchar(%d)", ti.Size)
 		}

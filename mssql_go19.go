@@ -110,7 +110,7 @@ func (c *Conn) CheckNamedValue(nv *driver.NamedValue) error {
 		return nil
 	case *ReturnStatus:
 		*v = 0 // By default the return value should be zero.
-		c.sess.returnStatus = v
+		c.returnStatus = v
 		return driver.ErrRemoveArgument
 	case TVP:
 		return nil

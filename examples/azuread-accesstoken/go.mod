@@ -1,8 +1,8 @@
-module github.com/famarks/go-mssqldb/examples/azure-ad-accesstoken
+module github.com/denisenkom/go-mssqldb/examples/azure-ad-accesstoken
 
 go 1.13
 
 require (
 	github.com/Azure/go-autorest/autorest/adal v0.8.1
-	github.com/famarks/go-mssqldb v0.0.0-20240117051337-f6088e5786c6
+	github.com/denisenkom/go-mssqldb v0.0.0-20191128021309-1d7a30a10f73
 )

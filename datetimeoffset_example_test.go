@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-sql/civil"
-	mssql "github.com/famarks/go-mssqldb"
+	"github.com/denisenkom/go-mssqldb"
 )
 
 // This example shows how to insert and retrieve date and time types data
@@ -49,8 +49,6 @@ func insertDateTime(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer stmt.Close()
-
 	tin, err := time.Parse(time.RFC3339, "2006-01-02T22:04:05.787-07:00")
 	if err != nil {
 		log.Fatal(err)

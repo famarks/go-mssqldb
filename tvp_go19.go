@@ -4,7 +4,6 @@ package mssql
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -98,9 +97,6 @@ func (tvp TVP) encode(schema, name string, columnStr []columnStruct, tvpFieldInd
 		for columnStrIdx, fieldIdx := range tvpFieldIndexes {
 			field := refStr.Field(fieldIdx)
 			tvpVal := field.Interface()
-			if tvp.verifyStandardTypeOnNull(buf, tvpVal) {
-				continue
-			}
 			valOf := reflect.ValueOf(tvpVal)
 			elemKind := field.Kind()
 			if elemKind == reflect.Ptr && valOf.IsNil() {
@@ -159,7 +155,7 @@ func (tvp TVP) columnTypes() ([]columnStruct, []int, error) {
 			defaultValues = append(defaultValues, v.Interface())
 			continue
 		}
-		defaultValues = append(defaultValues, tvp.createZeroType(reflect.Zero(field.Type).Interface()))
+		defaultValues = append(defaultValues, reflect.Zero(field.Type).Interface())
 	}
 
 	if columnCount-len(tvpFieldIndexes) == columnCount {
@@ -213,80 +209,23 @@ func getSchemeAndName(tvpName string) (string, string, error) {
 	}
 	splitVal := strings.Split(tvpName, ".")
 	if len(splitVal) > 2 {
-		return "", "", ErrorObjectName
+		return "", "", errors.New("wrong tvp name")
 	}
-	const (
-		openSquareBrackets  = "["
-		closeSquareBrackets = "]"
-	)
 	if len(splitVal) == 2 {
 		res := make([]string, 2)
 		for key, value := range splitVal {
-			tmp := strings.Replace(value, openSquareBrackets, "", -1)
-			tmp = strings.Replace(tmp, closeSquareBrackets, "", -1)
+			tmp := strings.Replace(value, "[", "", -1)
+			tmp = strings.Replace(tmp, "]", "", -1)
 			res[key] = tmp
 		}
 		return res[0], res[1], nil
 	}
-	tmp := strings.Replace(splitVal[0], openSquareBrackets, "", -1)
-	tmp = strings.Replace(tmp, closeSquareBrackets, "", -1)
+	tmp := strings.Replace(splitVal[0], "[", "", -1)
+	tmp = strings.Replace(tmp, "]", "", -1)
 
 	return "", tmp, nil
 }
 
 func getCountSQLSeparators(str string) int {
 	return strings.Count(str, sqlSeparator)
-}
-
-// verify types https://golang.org/pkg/database/sql/
-func (tvp TVP) createZeroType(fieldVal interface{}) interface{} {
-	const (
-		defaultBool    = false
-		defaultFloat64 = float64(0)
-		defaultInt64   = int64(0)
-		defaultString  = ""
-	)
-
-	switch fieldVal.(type) {
-	case sql.NullBool:
-		return defaultBool
-	case sql.NullFloat64:
-		return defaultFloat64
-	case sql.NullInt64:
-		return defaultInt64
-	case sql.NullString:
-		return defaultString
-	}
-	return fieldVal
-}
-
-// verify types https://golang.org/pkg/database/sql/
-func (tvp TVP) verifyStandardTypeOnNull(buf *bytes.Buffer, tvpVal interface{}) bool {
-	const (
-		defaultNull = uint8(0)
-	)
-
-	switch val := tvpVal.(type) {
-	case sql.NullBool:
-		if !val.Valid {
-			binary.Write(buf, binary.LittleEndian, defaultNull)
-			return true
-		}
-	case sql.NullFloat64:
-		if !val.Valid {
-			binary.Write(buf, binary.LittleEndian, defaultNull)
-			return true
-		}
-	case sql.NullInt64:
-		if !val.Valid {
-			binary.Write(buf, binary.LittleEndian, defaultNull)
-			return true
-		}
-	case sql.NullString:
-		if !val.Valid {
-			binary.Write(buf, binary.LittleEndian, uint64(_PLP_NULL))
-			return true
-		}
-	}
-	return false
 }

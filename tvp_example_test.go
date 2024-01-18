@@ -8,13 +8,15 @@ import (
 	"fmt"
 	"log"
 
-	mssql "github.com/famarks/go-mssqldb"
+	mssql "github.com/denisenkom/go-mssqldb"
 )
 
 // This example shows how to use tvp type
 func ExampleTVP() {
 	const (
 		createTable = "CREATE TABLE Location (Name VARCHAR(50), CostRate INT, Availability BIT, ModifiedDate DATETIME2)"
+
+		dropTable = "IF OBJECT_ID('Location', 'U') IS NOT NULL DROP TABLE Location"
 
 		createTVP = `CREATE TYPE LocationTableType AS TABLE
 		(LocationName VARCHAR(50),

@@ -37,17 +37,11 @@ type connectParams struct {
 	failOverPartner           string
 	failOverPort              uint64
 	packetSize                uint16
-	fedAuthLibrary            int
-	fedAuthADALWorkflow       byte
+	fedAuthAccessToken        string
 }
 
-// default packet size for TDS buffer
-const defaultPacketSize = 4096
-
 func parseConnectParams(dsn string) (connectParams, error) {
-	p := connectParams{
-		fedAuthLibrary: fedAuthLibraryReserved,
-	}
+	var p connectParams
 
 	var params map[string]string
 	if strings.HasPrefix(dsn, "odbc:") {
@@ -71,7 +65,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 		var err error
 		p.logFlags, err = strconv.ParseUint(strlog, 10, 64)
 		if err != nil {
-			return p, fmt.Errorf("invalid log parameter '%s': %s", strlog, err.Error())
+			return p, fmt.Errorf("Invalid log parameter '%s': %s", strlog, err.Error())
 		}
 	}
 	server := params["server"]
@@ -93,19 +87,20 @@ func parseConnectParams(dsn string) (connectParams, error) {
 		var err error
 		p.port, err = strconv.ParseUint(strport, 10, 16)
 		if err != nil {
-			f := "invalid tcp port '%v': %v"
+			f := "Invalid tcp port '%v': %v"
 			return p, fmt.Errorf(f, strport, err.Error())
 		}
 	}
 
 	// https://docs.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-network-packet-size-server-configuration-option
-	p.packetSize = defaultPacketSize
+	// Default packet size remains at 4096 bytes
+	p.packetSize = 4096
 	strpsize, ok := params["packet size"]
 	if ok {
 		var err error
 		psize, err := strconv.ParseUint(strpsize, 0, 16)
 		if err != nil {
-			f := "invalid packet size '%v': %v"
+			f := "Invalid packet size '%v': %v"
 			return p, fmt.Errorf(f, strpsize, err.Error())
 		}
 
@@ -128,7 +123,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 	if strconntimeout, ok := params["connection timeout"]; ok {
 		timeout, err := strconv.ParseUint(strconntimeout, 10, 64)
 		if err != nil {
-			f := "invalid connection timeout '%v': %v"
+			f := "Invalid connection timeout '%v': %v"
 			return p, fmt.Errorf(f, strconntimeout, err.Error())
 		}
 		p.conn_timeout = time.Duration(timeout) * time.Second
@@ -137,7 +132,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 	if strdialtimeout, ok := params["dial timeout"]; ok {
 		timeout, err := strconv.ParseUint(strdialtimeout, 10, 64)
 		if err != nil {
-			f := "invalid dial timeout '%v': %v"
+			f := "Invalid dial timeout '%v': %v"
 			return p, fmt.Errorf(f, strdialtimeout, err.Error())
 		}
 		p.dial_timeout = time.Duration(timeout) * time.Second
@@ -149,7 +144,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 	if keepAlive, ok := params["keepalive"]; ok {
 		timeout, err := strconv.ParseUint(keepAlive, 10, 64)
 		if err != nil {
-			f := "invalid keepAlive value '%s': %s"
+			f := "Invalid keepAlive value '%s': %s"
 			return p, fmt.Errorf(f, keepAlive, err.Error())
 		}
 		p.keepAlive = time.Duration(timeout) * time.Second
@@ -162,7 +157,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 			var err error
 			p.encrypt, err = strconv.ParseBool(encrypt)
 			if err != nil {
-				f := "invalid encrypt '%s': %s"
+				f := "Invalid encrypt '%s': %s"
 				return p, fmt.Errorf(f, encrypt, err.Error())
 			}
 		}
@@ -174,7 +169,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 		var err error
 		p.trustServerCertificate, err = strconv.ParseBool(trust)
 		if err != nil {
-			f := "invalid trust server certificate '%s': %s"
+			f := "Invalid trust server certificate '%s': %s"
 			return p, fmt.Errorf(f, trust, err.Error())
 		}
 	}
@@ -214,7 +209,7 @@ func parseConnectParams(dsn string) (connectParams, error) {
 	if ok {
 		if appintent == "ReadOnly" {
 			if p.database == "" {
-				return p, fmt.Errorf("database must be specified when ApplicationIntent is ReadOnly")
+				return p, fmt.Errorf("Database must be specified when ApplicationIntent is ReadOnly")
 			}
 			p.typeFlags |= fReadOnlyIntent
 		}
@@ -230,36 +225,12 @@ func parseConnectParams(dsn string) (connectParams, error) {
 		var err error
 		p.failOverPort, err = strconv.ParseUint(failOverPort, 0, 16)
 		if err != nil {
-			f := "invalid tcp port '%v': %v"
+			f := "Invalid tcp port '%v': %v"
 			return p, fmt.Errorf(f, failOverPort, err.Error())
 		}
 	}
 
 	return p, nil
-}
-
-// convert connectionParams to url style connection string
-// used mostly for testing
-func (p connectParams) toUrl() *url.URL {
-	q := url.Values{}
-	if p.database != "" {
-		q.Add("database", p.database)
-	}
-	if p.logFlags != 0 {
-		q.Add("log", strconv.FormatUint(p.logFlags, 10))
-	}
-	res := url.URL{
-		Scheme: "sqlserver",
-		Host:   p.host,
-		User:   url.UserPassword(p.user, p.password),
-	}
-	if p.instance != "" {
-		res.Path = p.instance
-	}
-	if len(q) > 0 {
-		res.RawQuery = q.Encode()
-	}
-	return &res
 }
 
 func splitConnectionString(dsn string) (res map[string]string) {
@@ -369,7 +340,7 @@ func splitConnectionStringOdbc(dsn string) (map[string]string, error) {
 		case parserStateBeforeKey:
 			switch {
 			case c == '=':
-				return res, fmt.Errorf("unexpected character = at index %d. Expected start of key or semi-colon or whitespace", i)
+				return res, fmt.Errorf("Unexpected character = at index %d. Expected start of key or semi-colon or whitespace.", i)
 			case !unicode.IsSpace(c) && c != ';':
 				state = parserStateKey
 				key += string(c)
@@ -448,7 +419,7 @@ func splitConnectionStringOdbc(dsn string) (map[string]string, error) {
 			case unicode.IsSpace(c):
 				// Ignore whitespace
 			default:
-				return res, fmt.Errorf("unexpected character %c at index %d. Expected semi-colon or whitespace", c, i)
+				return res, fmt.Errorf("Unexpected character %c at index %d. Expected semi-colon or whitespace.", c, i)
 			}
 
 		case parserStateEndValue:
@@ -458,7 +429,7 @@ func splitConnectionStringOdbc(dsn string) (map[string]string, error) {
 			case unicode.IsSpace(c):
 				// Ignore whitespace
 			default:
-				return res, fmt.Errorf("unexpected character %c at index %d. Expected semi-colon or whitespace", c, i)
+				return res, fmt.Errorf("Unexpected character %c at index %d. Expected semi-colon or whitespace.", c, i)
 			}
 		}
 	}
@@ -473,7 +444,7 @@ func splitConnectionStringOdbc(dsn string) (map[string]string, error) {
 	case parserStateBareValue:
 		res[key] = strings.TrimRightFunc(value, unicode.IsSpace)
 	case parserStateBracedValue:
-		return res, fmt.Errorf("unexpected end of braced value at index %d", len(dsn))
+		return res, fmt.Errorf("Unexpected end of braced value at index %d.", len(dsn))
 	case parserStateBracedValueClosingBrace: // End of braced value
 		res[key] = value
 	case parserStateEndValue: // Okay
